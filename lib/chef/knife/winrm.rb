@@ -230,7 +230,7 @@ class Chef
 
       def run
         STDOUT.sync = STDERR.sync = true
-
+        retries = 20
         begin
           @longest = 0
 
@@ -254,6 +254,10 @@ class Chef
           when /401/
             ui.error "Failed to authenticate to #{@name_args[0].split(" ")} as #{config[:winrm_user]}"
             ui.info "Response: #{e.message}"
+            raise if (retries -= 1) <= 0
+            ui.info "Retrying in 10 seconds"
+            sleep 10 
+            retry 
           else
             raise e
           end
