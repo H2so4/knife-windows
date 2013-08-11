@@ -230,34 +230,53 @@ class Chef
 
       def run
         STDOUT.sync = STDERR.sync = true
-        retries = 20
+        retries = 10
+        args = @name_args
         begin
           @longest = 0
 
-          configure_session
-
-          case @name_args[1]
-          when "interactive"
-            interactive
-          else
-            winrm_command(@name_args[1..-1].join(" "))
-
+          
+          begin 
+            configure_session
+            winrm_command('cmd.exe /C echo testing')
             if config[:returns]
               check_for_errors! session.exit_codes
             end
 
             session.close
             @exit_code || 0
+          rescue
+            raise if (retries -= 1) <= 0
+            ui.info "Retrying in 30 seconds"
+            sleep 30 
+            retry 
+          end
+
+          configure_session
+          puts '***Printing args'
+          puts @name_args
+
+          case args[1]
+          when "interactive"
+            interactive
+          else
+            winrm_command(args[1..-1].join(" "))
+              if config[:returns]
+              check_for_errors! session.exit_codes
+              end
+
+              session.close
+              @exit_code || 0
+            
+
+            
           end
         rescue WinRM::WinRMHTTPTransportError => e
           case e.message
           when /401/
             ui.error "Failed to authenticate to #{@name_args[0].split(" ")} as #{config[:winrm_user]}"
             ui.info "Response: #{e.message}"
-            raise if (retries -= 1) <= 0
-            ui.info "Retrying in 10 seconds"
-            sleep 10 
-            retry 
+            
           else
             raise e
           end
